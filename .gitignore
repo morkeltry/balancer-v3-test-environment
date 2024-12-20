@@ -28,6 +28,9 @@ forge-artifacts/
 forge-cache/
 .invariant
 
+# Slither
+slither.db.json
+
 # Typechain
 typechain-types/
 
