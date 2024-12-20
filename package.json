@@ -32,5 +32,8 @@
   "workspaces": [
     "pkg/*",
     "pvt/*"
-  ]
+  ],
+  "dependencies": {
+    "@openzeppelin/contracts": "^5.1.0"
+  }
 }
