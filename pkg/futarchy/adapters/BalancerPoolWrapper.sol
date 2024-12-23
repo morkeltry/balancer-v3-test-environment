@@ -46,6 +46,10 @@ interface IBalancerVault {
     ) external returns (address);
 }
 
+// contract has no storage - suitable for delegatecall if authed functions are safe.
+// delegatecall does not introduce vulns if:
+// . this contract does not further delegate calls
+// . calling contract intends to delegate its context to the code here
 contract BalancerPoolWrapper {
     using SafeERC20 for IERC20;
 

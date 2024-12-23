@@ -3,6 +3,7 @@ pragma solidity ^0.8.20;
 
 import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
+import "@openzeppelin/contracts/utils/math/Math.sol";
 import "../interfaces/ICTFAdapter.sol";
 import {  } from "../adapters/CTFAdapter.sol";
 import "../interfaces/IBalancerPoolWrapper.sol";
@@ -13,9 +14,8 @@ contract FutarchyPoolManager {
 
     ICTFAdapter public immutable ctfAdapter;
     IBalancerPoolWrapper public immutable balancerWrapper;
-
-    IERC20 public immutable outcomeToken;
     IERC20 public immutable moneyToken;
+    IERC20 public immutable quoteToken;
 
     bool public useEnhancedSecurity;
     address public admin;
@@ -28,10 +28,10 @@ contract FutarchyPoolManager {
     }
 
     struct ConditionTokens {
-        address outcomeYesToken;
-        address outcomeNoToken;
         address moneyYesToken;
         address moneyNoToken;
+        address quoteYesToken;
+        address quoteNoToken;
     }
 
     mapping(bytes32 => ConditionalPools) public conditionPools;
@@ -79,16 +79,19 @@ contract FutarchyPoolManager {
         emit SplitAllowed(baseToken, splitToken1, splitToken2);
     }
 
+    // Use the BalancerPoolWrapper contract to create a  token swap ppol in the vault BalancerPoolWrapper was instantiated with.
+    // NB currently only using 80/20 weight
     function createBasePool(                    
         uint256 moneyToken,
         uint256 quoteToken,
-        uint256 weight                          // but wait - can you just decide the weight? don't prices float?
+        uint256 weight                          // NB currently ignored. Calling 80/20 Factory
     ) external returns (address) {
-        
+        require (basePool==address(0), "basePool aready set.");
+
         bool success;
         // // Delegatecall to createPool on our balancerWrapper contract
         // (success, bytes memory data) = balancerWrapper.delegatecall(
-        //     abi.encodeWithSignature("createPool(address,address,uint256)", address(outcomeToken), address(moneyToken), weight)
+        //     abi.encodeWithSignature("createPool(address,address,uint256)", address(moneyToken), address(quoteToken), weight)
         // );        
         // require(success, "Delegatecall failed in createPool(address,address,uint256) on balancerWrapper");
         // address basePool = abi.decode(data, (address));
@@ -97,15 +100,16 @@ contract FutarchyPoolManager {
         (success, bytes memory data) = balancerWrapper.delegatecall(
             abi.encodeWithSignature("create8020Pool(address,address)", address(moneyToken), address(quoteToken))
         );        
-        require(success, "Delegatecall failed in create8020Pool(address,address) on balancerWrapper");
-        address basePool = abi.decode(data, (address));
+        require(success, "Delegatecall failed to create8020Pool(address,address) on balancerWrapper");
+        address newPool = abi.decode(data, (address));
 
         // Delegatecall to addLiquidity on our balancerWrapper contract
         (success) = balancerWrapper.delegatecall(
-            abi.encodeWithSignature("addLiquidity(address,uint256,uint256)", basePool, moneyAmount, quoteAmount)
+            abi.encodeWithSignature("addLiquidity(address,uint256,uint256)", newPool, moneyAmount, quoteAmount)
         );
-        require(success, "Delegatecall to addLiquidity(address,uint256,uint256) on balancerWrapper");
+        require(success, "Delegatecall failed to addLiquidity(address,uint256,uint256) on balancerWrapper");
 
+        basePool = newPool;
         return basePool;
     }
 
@@ -113,48 +117,52 @@ contract FutarchyPoolManager {
         bytes32 conditionId,
         uint256 baseAmount
     ) external returns (address yesPool, address noPool) {
+        // ???
         if (conditionPools[conditionId].isActive) revert ConditionAlreadyActive();
+        //TODO: what to do if conditionId exists but is not 'active'?
 
-        uint256 beforeOutBase = outcomeToken.balanceOf(address(this));
-        uint256 beforeMonBase = moneyToken.balanceOf(address(this));
+        uint256 beforeMoneyBal = moneyToken.balanceOf(address(this));
+        uint256 beforeQuoteBal = quoteToken.balanceOf(address(this));
 
-        (uint256 outAmt, uint256 monAmt) = balancerWrapper.removeLiquidity(basePool, baseAmount);
+        // NB swapped order so that moneyToken / highWeightToken / 80% comes first
+        (uint256 moneyAmount, uint256 quoteAmount) = balancerWrapper.removeLiquidity(basePool, baseAmount);
 
-        // TODO: Swap order for CIE
-        (address outYes, address outNo, address monYes, address monNo) = _doSplit(conditionId, outAmt, monAmt);
-        if (useEnhancedSecurity) {
-            _enforceAllowedSplit(address(outcomeToken), outYes, outNo);
-            _enforceAllowedSplit(address(moneyToken), monYes, monNo);
+        // TODO: check these for order; sanity
+        // if (useEnhancedSecurity) {
+        //     _enforceAllowedSplit(address(outcomeToken), outYes, outNo);
+        //     _enforceAllowedSplit(address(moneyToken), monYes, monNo);
 
-            _verifySplitDimension(
-                beforeOutBase,
-                outcomeToken.balanceOf(address(this)),
-                IERC20(outYes).balanceOf(address(this)),
-                IERC20(outNo).balanceOf(address(this))
-            );
+        //     _verifySplitDimension(
+        //         beforeOutBase,
+        //         outcomeToken.balanceOf(address(this)),
+        //         IERC20(outYes).balanceOf(address(this)),
+        //         IERC20(outNo).balanceOf(address(this))
+        //     );
 
-            _verifySplitDimension(
-                beforeMonBase,
-                moneyToken.balanceOf(address(this)),
-                IERC20(monYes).balanceOf(address(this)),
-                IERC20(monNo).balanceOf(address(this))
-            );
-        }
+        //     _verifySplitDimension(
+        //         beforeMonBase,
+        //         moneyToken.balanceOf(address(this)),
+        //         IERC20(monYes).balanceOf(address(this)),
+        //         IERC20(monNo).balanceOf(address(this))
+        //     );
+        // }
+        (address moneyYes, address moneyNo, address quoteYes, address quoteNo, ) = _doSplit(conditionId, moneyAmount, quoteAmount);
 
+        // NB general createPool not yet implemented, only create8020Pool
         yesPool = balancerWrapper.createPool(outYes, monYes, 500000);
         noPool = balancerWrapper.createPool(outNo, monNo, 500000);
 
-        _storeConditionPools(conditionId, yesPool, noPool);
-        _storeConditionTokens(conditionId, outYes, outNo, monYes, monNo);
+        conditionPools[conditionId] = ConditionalPools(yesPool, noPool, true);
+        conditionTokens[conditionId] = ConditionTokens(moneyYes, moneyNo, quoteYes, quoteNo);
 
-        emit SplitPerformed(address(outcomeToken), outYes, outNo);
-        emit SplitPerformed(address(moneyToken), monYes, monNo);
+        emit SplitPerformed(address(moneyToken), moneyYes, moneyNo);
+        emit SplitPerformed(address(quoteToken), quoteYes, quoteNo);
 
         return (yesPool, noPool);
     }
 
     function mergeAfterSettlement(bytes32 conditionId) external {
-        ConditionalPools storage pools = conditionPools[conditionId];
+        ConditionalPools memory pools = conditionPools[conditionId];
         if (!pools.isActive) revert ConditionNotActive();
 
         ConditionTokens memory ct = conditionTokens[conditionId];
@@ -225,25 +233,25 @@ contract FutarchyPoolManager {
         monNo = monC[0];
     }
 
+    // kinda unnecessary - any sanity checks should take place well before storage
     function _storeConditionPools(bytes32 conditionId, address yesPool, address noPool) internal {
         // TODO: add existence check
         conditionPools[conditionId] = ConditionalPools(yesPool, noPool, true);
     }
 
+    // kinda unnecessary - any sanity checks should take place well before storage
     function _storeConditionTokens(
         bytes32 conditionId,
-        address outYes,
-        address outNo,
-        address monYes,
-        address monNo
+        address moneyYes,
+        address moneyNo,
+        address quoteYes,
+        address quoteNo,
     ) internal {
-        ConditionTokens storage ct = conditionTokens[conditionId];
-        ct.outcomeYesToken = outYes;
-        ct.outcomeNoToken = outNo;
-        ct.moneyYesToken = monYes;
-        ct.moneyNoToken = monNo;
+        conditionTokens[conditionId] = ConditionTokens(moneyYes, moneyNo, quoteYes, quoteNo);
     }
 
+    // TODO: check- are 'Yes' and 'No' canonical?
+    // ??? How do we know yes/ no as tokens if they are not split yet?
     function _enforceAllowedSplit(address baseTok, address yesTok, address noTok) internal view {
         if (!allowedSplits[keccak256(abi.encodePacked(baseTok, yesTok, noTok))]) revert SplitNotAllowed();
     }
@@ -257,13 +265,13 @@ contract FutarchyPoolManager {
         uint256 yesAfter,
         uint256 noAfter
     ) internal pure {
-        uint256 baseDelta = baseBefore > baseAfter ? baseBefore - baseAfter : 0;
-        uint256 yesDelta = yesAfter;
-        uint256 noDelta = noAfter;
-
-        if (baseDelta == 0 || yesDelta != baseDelta || noDelta != baseDelta) {
-            revert("Exact split integrity check failed");
-        }
+        uint256 baseDelta = Math.max(baseBefore - baseAfter, 0);
+        require (
+            (baseBefore>=baseAfter 
+                && yesAfter == baseDelta 
+                && noAfter == baseDelta
+            ), "Exact split integrity check failed"
+        );
     }
 
     // On merging: max(yesSpent, noSpent) = baseGained
@@ -275,13 +283,15 @@ contract FutarchyPoolManager {
         uint256 baseBefore,
         uint256 baseAfter
     ) internal pure {
-        uint256 yesDelta = yesBefore > yesAfter ? yesBefore - yesAfter : 0;
-        uint256 noDelta = noBefore > noAfter ? noBefore - noAfter : 0;
-        uint256 maxDelta = yesDelta >= noDelta ? yesDelta : noDelta;
-        uint256 baseDelta = baseAfter > baseBefore ? baseAfter - baseBefore : 0;
 
-        if (maxDelta != baseDelta) {
-            revert("Exact merge all-sides integrity check failed");
-        }
+        uint256 maxDelta = Math.max(
+            Math.max(yesBefore - yesAfter, 0), 
+            Math.max(noBefore - noAfter, 0));
+        uint256 baseDelta = Math.max(baseAfter - baseBefore, 0);
+
+        require (
+            maxDelta != baseDelta, 
+            "Exact merge all-sides integrity check failed"
+        );
     }
 }
