@@ -57,14 +57,14 @@ contract FutarchyPoolManager {
     constructor(
         address _ctfAdapter,            // ???  where does this get called?
         address _balancerWrapper,       // ???  is wrapper unique? what's it for?
-        address _outcomeToken,
+        address _quoteToken,
         address _moneyToken,            
         bool _useEnhancedSecurity,
         address _admin                  // ???  why need admin?
     ) {
         ctfAdapter = ICTFAdapter(_ctfAdapter);
         balancerWrapper = IBalancerPoolWrapper(_balancerWrapper);
-        outcomeToken = IERC20(_outcomeToken);
+        quoteToken = IERC20(_quoteToken);
         moneyToken = IERC20(_moneyToken);
         useEnhancedSecurity = _useEnhancedSecurity;
         admin = _admin;
@@ -129,18 +129,18 @@ contract FutarchyPoolManager {
 
         // TODO: check these for order; sanity
         // if (useEnhancedSecurity) {
-        //     _enforceAllowedSplit(address(outcomeToken), outYes, outNo);
+        //     _enforceAllowedSplit(address(quoteToken), outYes, outNo);
         //     _enforceAllowedSplit(address(moneyToken), monYes, monNo);
 
         //     _verifySplitDimension(
-        //         beforeOutBase,
-        //         outcomeToken.balanceOf(address(this)),
+        //         beforeQuoteBase,
+        //         quoteToken.balanceOf(address(this)),
         //         IERC20(outYes).balanceOf(address(this)),
         //         IERC20(outNo).balanceOf(address(this))
         //     );
 
         //     _verifySplitDimension(
-        //         beforeMonBase,
+        //         beforeMoneyBase,
         //         moneyToken.balanceOf(address(this)),
         //         IERC20(monYes).balanceOf(address(this)),
         //         IERC20(monNo).balanceOf(address(this))
@@ -167,50 +167,46 @@ contract FutarchyPoolManager {
 
         ConditionTokens memory ct = conditionTokens[conditionId];
 
-        uint256 beforeOutBase = outcomeToken.balanceOf(address(this));
-        uint256 beforeMonBase = moneyToken.balanceOf(address(this));
-        uint256 beforeOutYes = IERC20(ct.outcomeYesToken).balanceOf(address(this));
-        uint256 beforeOutNo = IERC20(ct.outcomeNoToken).balanceOf(address(this));
-        uint256 beforeMonYes = IERC20(ct.moneyYesToken).balanceOf(address(this));
-        uint256 beforeMonNo = IERC20(ct.moneyNoToken).balanceOf(address(this));
+        (uint256 beforeQuoteBase, uint256 beforeQuoteBase, uint256 beforeQuoteYes, 
+        uint256 beforeQuoteNo, uint256 beforeMoneyYes, uint256 beforeMoneyNo)  = getBalances();
 
-        (uint256 outAmt, uint256 monAmt) = balancerWrapper.removeLiquidity(pools.yesPool, type(uint256).max);
+        (uint256 moneyAmount, uint256 quoteAmount) = 
+            balancerWrapper.removeLiquidity(pools.yesPool, type(uint256).max);
 
         // Redeem
-        IERC20(ct.outcomeYesToken).approve(address(ctfAdapter), outAmt);
-        IERC20(ct.moneyYesToken).approve(address(ctfAdapter), monAmt);
+        IERC20(ct.quoteYesToken).approve(address(ctfAdapter), moneyAmount);
+        IERC20(ct.moneyYesToken).approve(address(ctfAdapter), quoteAmount);
 
         uint256[] memory amounts = new uint256[](2);
         amounts[0] = 0; 
         amounts[1] = outAmt;
-        ctfAdapter.redeemPositions(outcomeToken, conditionId, amounts, 2);
+        ctfAdapter.redeemPositions(quoteToken, conditionId, amounts, 2);
 
         amounts[1] = monAmt;
         ctfAdapter.redeemPositions(moneyToken, conditionId, amounts, 2);
 
-        uint256 afterOutBase = outcomeToken.balanceOf(address(this));
-        uint256 afterMonBase = moneyToken.balanceOf(address(this));
-        uint256 afterOutYes = IERC20(ct.outcomeYesToken).balanceOf(address(this));
-        uint256 afterOutNo = IERC20(ct.outcomeNoToken).balanceOf(address(this));
-        uint256 afterMonYes = IERC20(ct.moneyYesToken).balanceOf(address(this));
-        uint256 afterMonNo = IERC20(ct.moneyNoToken).balanceOf(address(this));
 
+        (uint256 afterQuoteBase, uint256 afterMoneyBase, uint256 afterQuoteYes, 
+        uint256 afterQuoteNo, uint256 afterMoneyYes, uint256 afterMoneyNo) = getBalances();
+
+        // TODO: Is this gas exhaustion safe? (check is post-effect)
         if (useEnhancedSecurity) {
-            _verifyMergeAllSides(beforeOutYes, afterOutYes, beforeOutNo, afterOutNo, beforeOutBase, afterOutBase);
-            _verifyMergeAllSides(beforeMonYes, afterMonYes, beforeMonNo, afterMonNo, beforeMonBase, afterMonBase);
+            _verifyMergeAllSides(beforeQuoteYes, afterQuoteYes, beforeQuoteNo, afterQuoteNo, beforeQuoteBase, afterQuoteBase);
+            _verifyMergeAllSides(beforeMonYes, afterMonYes, beforeMonNo, afterMonNo, beforeMoneyBase, afterMoneyBase);
         }
 
-        uint256 outR = afterOutBase > beforeOutBase ? (afterOutBase - beforeOutBase) : 0;
-        uint256 monR = afterMonBase > beforeMonBase ? (afterMonBase - beforeMonBase) : 0;
+        uint256 outR = Math.max(afterQuoteBase - beforeQuoteBase, 0);
+        uint256 monR = Math.max(afterMoneyBase - beforeMoneyBase, 0);
 
-        outcomeToken.approve(address(balancerWrapper), outR);
+        quoteToken.approve(address(balancerWrapper), outR);
         moneyToken.approve(address(balancerWrapper), monR);
         balancerWrapper.addLiquidity(basePool, outR, monR);
 
         delete conditionPools[conditionId];
         delete conditionTokens[conditionId];
 
-        emit MergePerformed(address(outcomeToken), ct.outcomeYesToken);
+        // TODO: Is cast necessary?
+        emit MergePerformed(address(quoteToken), ct.quoteYesToken);
         emit MergePerformed(address(moneyToken), ct.moneyYesToken);
     }
 
@@ -221,10 +217,10 @@ contract FutarchyPoolManager {
         uint256 outAmt,
         uint256 monAmt
     ) internal returns (address outYes, address outNo, address monYes, address monNo) {
-        outcomeToken.approve(address(ctfAdapter), outAmt);
+        quoteToken.approve(address(ctfAdapter), outAmt);
         moneyToken.approve(address(ctfAdapter), monAmt);
 
-        address[] memory outC = ctfAdapter.splitCollateralTokens(outcomeToken, conditionId, outAmt, 2);
+        address[] memory outC = ctfAdapter.splitCollateralTokens(quoteToken, conditionId, outAmt, 2);
         address[] memory monC = ctfAdapter.splitCollateralTokens(moneyToken, conditionId, monAmt, 2);
 
         outYes = outC[1];
@@ -258,6 +254,23 @@ contract FutarchyPoolManager {
 
     // Verification functions
 
+    funtion getBalances(
+        // address selfAddy,
+        // ConditionTokens ct
+    ) internal pure returns (
+        uint256 quoteBase, uint256 moneyBase, uint256 quoteYes, uint256 quoteNo, uint256 moneyYes, uint256 moneyNo
+    )  {
+        address selfAddy = address(this);
+        ConditionTokens memory ct = conditionTokens;
+
+        quoteBase = quoteToken.balanceOf(address(this));
+        moneyBase = moneyToken.balanceOf(address(this));
+        quoteYes = IERC20(ct.quoteYesToken).balanceOf(address(this));
+        quoteNo = IERC20(ct.quoteNoToken).balanceOf(address(this));
+        moneyYes = IERC20(ct.moneyYesToken).balanceOf(address(this));
+        moneyNo = IERC20(ct.moneyNoToken).balanceOf(address(this));
+    }
+
     // On splitting: baseDelta = yesDelta = noDelta
     function _verifySplitDimension(
         uint256 baseBefore,
@@ -284,6 +297,27 @@ contract FutarchyPoolManager {
         uint256 baseAfter
     ) internal pure {
 
+        uint256 maxDelta = Math.max(
+            Math.max(yesBefore - yesAfter, 0), 
+            Math.max(noBefore - noAfter, 0));
+        uint256 baseDelta = Math.max(baseAfter - baseBefore, 0);
+
+        require (
+            maxDelta != baseDelta, 
+            "Exact merge all-sides integrity check failed"
+        );
+    }
+
+
+    // On merging: max(yesSpent, noSpent) = baseGained
+    function _verifyMergeAllSides(
+        uint256 yesBefore,
+        uint256 yesAfter,
+        uint256 noBefore,
+        uint256 noAfter,
+        uint256 baseBefore,
+        uint256 baseAfter
+    ) internal pure {
         uint256 maxDelta = Math.max(
             Math.max(yesBefore - yesAfter, 0), 
             Math.max(noBefore - noAfter, 0));

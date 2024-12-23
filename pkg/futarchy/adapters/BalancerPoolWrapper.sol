@@ -141,8 +141,8 @@ contract BalancerPoolWrapper {
     // may be called using delegatecall - be careful of authed calls / msg.sender as caller may use this code in its own context.
     function addLiquidity(
         address pool,
-        uint256 amountA,
-        uint256 amountB
+        uint256 moneyAmount, 
+        uint256 quoteAmount
     ) external returns (uint256 lpAmount) {
         // Get poolId from pool address
         bytes32 poolId; // Need to implement getting poolId from pool address
@@ -158,7 +158,7 @@ contract BalancerPoolWrapper {
             IBalancerVault.JoinPoolRequest({
                 assets: assets,
                 maxAmountsIn: maxAmountsIn,
-                userData: abi.encode(amountA, amountB),
+                userData: abi.encode(moneyAmount, quoteAmount),
                 fromInternalBalance: false
             })
         );
@@ -170,7 +170,7 @@ contract BalancerPoolWrapper {
     function removeLiquidity(
         address pool,
         uint256 lpAmount
-    ) external returns (uint256 amountA, uint256 amountB) {
+    ) external returns (uint256 moneyAmount, uint256 quoteAmount) {
         // Get poolId from pool address
         bytes32 poolId; // Need to implement getting poolId from pool address
 
@@ -190,7 +190,7 @@ contract BalancerPoolWrapper {
             })
         );
 
-        // Return actual amounts received
-        return (amountA, amountB);
+        // moneyAmount = 
+        // quoteAmount = 
     }
 }
