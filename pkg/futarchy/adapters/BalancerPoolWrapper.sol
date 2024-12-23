@@ -54,6 +54,7 @@ contract BalancerPoolWrapper {
         vault = IBalancerVault(_vault);
     }
 
+    // may be called using delegatecall - be careful of authed calls / msg.sender as caller may use this code in its own context.
     function createPool(
         address tokenA,
         address tokenB,
@@ -94,6 +95,7 @@ contract BalancerPoolWrapper {
         return pool;
     }
 
+    // may be called using delegatecall - be careful of authed calls / msg.sender as caller may use this code in its own context.
     function addLiquidity(
         address pool,
         uint256 amountA,

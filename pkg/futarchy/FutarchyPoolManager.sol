@@ -84,14 +84,21 @@ contract FutarchyPoolManager {
         uint256 moneyAmount,
         uint256 weight                          // but wait - can you just decide the weight? don't prices float?
     ) external returns (address) {
-        outcomeToken.safeTransferFrom(msg.sender, address(this), outcomeAmount);
-        moneyToken.safeTransferFrom(msg.sender, address(this), moneyAmount);
+        
+        bool success;
+        // Delegatecall to createPool on our balancerWrapper contract
+        (success, bytes memory data) = balancerWrapper.delegatecall(
+            abi.encodeWithSignature("createPool(address,address,uint256)", address(outcomeToken), address(moneyToken), weight)
+        );        
+        require(success, "Delegatecall failed in createPool(address,address,uint256) on balancerWrapper");
+        address basePool = abi.decode(data, (address));
 
-        outcomeToken.approve(address(balancerWrapper), outcomeAmount);
-        moneyToken.approve(address(balancerWrapper), moneyAmount);
+        // Delegatecall to addLiquidity on our balancerWrapper contract
+        (success) = balancerWrapper.delegatecall(
+            abi.encodeWithSignature("addLiquidity(address,uint256,uint256)", basePool, outcomeAmount, moneyAmount)
+        );
+        require(success, "Delegatecall to addLiquidity(address,uint256,uint256) on balancerWrapper"");
 
-        basePool = balancerWrapper.createPool(address(outcomeToken), address(moneyToken), weight);
-        balancerWrapper.addLiquidity(basePool, outcomeAmount, moneyAmount);
         return basePool;
     }
 
