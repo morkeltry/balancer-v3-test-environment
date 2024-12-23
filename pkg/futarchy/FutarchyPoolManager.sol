@@ -80,24 +80,31 @@ contract FutarchyPoolManager {
     }
 
     function createBasePool(                    
-        uint256 outcomeAmount,
-        uint256 moneyAmount,
+        uint256 moneyToken,
+        uint256 quoteToken,
         uint256 weight                          // but wait - can you just decide the weight? don't prices float?
     ) external returns (address) {
         
         bool success;
-        // Delegatecall to createPool on our balancerWrapper contract
+        // // Delegatecall to createPool on our balancerWrapper contract
+        // (success, bytes memory data) = balancerWrapper.delegatecall(
+        //     abi.encodeWithSignature("createPool(address,address,uint256)", address(outcomeToken), address(moneyToken), weight)
+        // );        
+        // require(success, "Delegatecall failed in createPool(address,address,uint256) on balancerWrapper");
+        // address basePool = abi.decode(data, (address));
+
+        // Delegatecall to create8020Pool on our balancerWrapper contract
         (success, bytes memory data) = balancerWrapper.delegatecall(
-            abi.encodeWithSignature("createPool(address,address,uint256)", address(outcomeToken), address(moneyToken), weight)
+            abi.encodeWithSignature("create8020Pool(address,address)", address(moneyToken), address(quoteToken))
         );        
-        require(success, "Delegatecall failed in createPool(address,address,uint256) on balancerWrapper");
+        require(success, "Delegatecall failed in create8020Pool(address,address) on balancerWrapper");
         address basePool = abi.decode(data, (address));
 
         // Delegatecall to addLiquidity on our balancerWrapper contract
         (success) = balancerWrapper.delegatecall(
-            abi.encodeWithSignature("addLiquidity(address,uint256,uint256)", basePool, outcomeAmount, moneyAmount)
+            abi.encodeWithSignature("addLiquidity(address,uint256,uint256)", basePool, moneyAmount, quoteAmount)
         );
-        require(success, "Delegatecall to addLiquidity(address,uint256,uint256) on balancerWrapper"");
+        require(success, "Delegatecall to addLiquidity(address,uint256,uint256) on balancerWrapper");
 
         return basePool;
     }

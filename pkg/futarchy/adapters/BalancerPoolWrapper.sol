@@ -4,7 +4,8 @@ pragma solidity ^0.8.20;
 import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 import "../interfaces/IBalancerPoolWrapper.sol";
-import "../../balancer-v3/pool-weighted/contracts/WeightedPool8020Factory.sol";
+import { create as createPool8020Balancer } from "../../balancer-v3/pool-weighted/contracts/WeightedPool8020Factory.sol";
+import { create as createPoolWeightedBalancer } from "../../balancer-v3/pool-weighted/contracts/WeightedPoolFactory.sol";
 import "../../balancer-v3/muhuhu/doesntexist.sol";
 
 interface IBalancerVault {
@@ -52,6 +53,44 @@ contract BalancerPoolWrapper {
 
     constructor(address _vault) {
         vault = IBalancerVault(_vault);
+    }
+
+
+    // used for 80/20 and general weighted pools
+    struct TokenConfig {
+        IERC20 token;
+        TokenType tokenType;
+        IRateProvider rateProvider;
+        bool paysYieldFees;
+    }
+
+    // may be called using delegatecall - be careful of authed calls / msg.sender as caller may use this code in its own context.
+    function create8020Pool(
+        address tokenHighWeight,
+        address tokenLowWeight
+    ) external returns (address pool) {
+
+        uint256 public immutable swapFee = 3000000000000000; // 0.3% swap fee
+        
+        struct PoolRoleAccounts {
+            address pauseManager;
+            address swapFeeManager;
+            address poolCreator;
+        }
+        // zeroes
+        PoolRoleAccounts adminRoleAccounts = new PoolRoleAccounts(address(0), address(0), address(0));
+
+        // zeroes except for token address
+        TokenConfig memory tkConfHigh = TokenConfig(IERC20(tokenHighWeight), TokenType.STANDARD, IRateProvider(address(0)), false);
+        TokenConfig memory tkConfLow = TokenConfig(IERC20(tokenLowWeight), TokenType.STANDARD, IRateProvider(address(0)), false);
+
+        // Create pool through Balancer
+        createPool8020Balancer(tkConfHigh, tkConfLow, adminRoleAccounts, swapFee);
+        
+        // No assetManagers 
+        // https://github.com/balancer/docs-developers/blob/main/references/valuing-balancer-lp-tokens/asset-managers.md
+        
+        return pool;
     }
 
     // may be called using delegatecall - be careful of authed calls / msg.sender as caller may use this code in its own context.
