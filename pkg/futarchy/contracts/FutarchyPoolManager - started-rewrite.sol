@@ -3,12 +3,12 @@ pragma solidity ^0.8.24;
 
 import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
-import "../interfaces/contracts/futarchy/IERC20Extended.sol";
+import "../../interfaces/contracts/futarchy/IERC20Extended.sol";
 import "./ERC20Extended.sol";
-import "../interfaces/contracts/futarchy/ICTFAdapter.sol";
-import "../interfaces/contracts/futarchy/IBalancerPoolWrapper.sol";
-// import "../interfaces/vault.IBasePool.sol";
-import "../interfaces/contracts/pool-weighted/IWeightedPool.sol";
+import "../../interfaces/contracts/futarchy/ICTFAdapter.sol";
+import "../../interfaces/contracts/futarchy/IBalancerPoolWrapper.sol";
+// import "../../interfaces/vault.IBasePool.sol";
+import "../../interfaces/contracts/pool-weighted/IWeightedPool.sol";
 
 
 contract FutarchyPoolManager {

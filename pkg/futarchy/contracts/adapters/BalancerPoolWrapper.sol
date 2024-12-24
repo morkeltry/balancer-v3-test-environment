@@ -3,10 +3,9 @@ pragma solidity ^0.8.20;
 
 import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
-import "../interfaces/IBalancerPoolWrapper.sol";
-import { create as createPool8020Balancer } from "../../balancer-v3/pool-weighted/contracts/WeightedPool8020Factory.sol";
-import { create as createPoolWeightedBalancer } from "../../balancer-v3/pool-weighted/contracts/WeightedPoolFactory.sol";
-import "../../balancer-v3/muhuhu/doesntexist.sol";
+import "../../../interfaces/contracts/futarchy/IBalancerPoolWrapper.sol";
+import { create as createPool8020Balancer } from "../../../pool-weighted/contracts/WeightedPool8020Factory.sol";
+import { create as createPoolWeightedBalancer } from "../../../pool-weighted/contracts/WeightedPoolFactory.sol";
 
 interface IBalancerVault {
     struct JoinPoolRequest {
@@ -67,6 +66,12 @@ contract BalancerPoolWrapper {
         IRateProvider rateProvider;
         bool paysYieldFees;
     }
+        
+    struct PoolRoleAccounts {
+        address pauseManager;
+        address swapFeeManager;
+        address poolCreator;
+    }
 
     // may be called using delegatecall - be careful of authed calls / msg.sender as caller may use this code in its own context.
     function create8020Pool(
@@ -74,13 +79,8 @@ contract BalancerPoolWrapper {
         address tokenLowWeight
     ) external returns (address pool) {
 
-        uint256 public immutable swapFee = 3000000000000000; // 0.3% swap fee
-        
-        struct PoolRoleAccounts {
-            address pauseManager;
-            address swapFeeManager;
-            address poolCreator;
-        }
+        uint256 swapFee = 3000000000000000; // 0.3% swap fee
+
         // zeroes
         PoolRoleAccounts adminRoleAccounts = new PoolRoleAccounts(address(0), address(0), address(0));
 

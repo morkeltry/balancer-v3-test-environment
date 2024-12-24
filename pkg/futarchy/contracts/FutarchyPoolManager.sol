@@ -4,10 +4,12 @@ pragma solidity ^0.8.20;
 import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 import "@openzeppelin/contracts/utils/math/Math.sol";
-import "../interfaces/ICTFAdapter.sol";
-import {  } from "../adapters/CTFAdapter.sol";
-import "../interfaces/IBalancerPoolWrapper.sol";
-import {  } from "../adapters/BalancerPoolWrapper.sol";
+import "../../interfaces/contracts/futarchy/ICTFAdapter.sol";
+import "../../interfaces/contracts/futarchy/IBalancerPoolWrapper.sol";
+// import {  } from "../adapters/BalancerPoolWrapper.sol";
+// import {  } from "../adapters/CTFAdapter.sol";
+import "./adapters/GnosisCTFAdapter.sol";
+import "./adapters/BalancerPoolWrapper.sol";
 
 contract FutarchyPoolManager {
     using SafeERC20 for IERC20;
@@ -97,7 +99,7 @@ contract FutarchyPoolManager {
         // address basePool = abi.decode(data, (address));
 
         // Delegatecall to create8020Pool on our balancerWrapper contract
-        (success, bytes memory data) = balancerWrapper.delegatecall(
+        (bool success, bytes memory data) = balancerWrapper.delegatecall(
             abi.encodeWithSignature("create8020Pool(address,address)", address(moneyToken), address(quoteToken))
         );        
         require(success, "Delegatecall failed to create8020Pool(address,address) on balancerWrapper");
@@ -241,7 +243,7 @@ contract FutarchyPoolManager {
         address moneyYes,
         address moneyNo,
         address quoteYes,
-        address quoteNo,
+        address quoteNo
     ) internal {
         conditionTokens[conditionId] = ConditionTokens(moneyYes, moneyNo, quoteYes, quoteNo);
     }
@@ -254,7 +256,7 @@ contract FutarchyPoolManager {
 
     // Verification functions
 
-    funtion getBalances(
+    function getBalances (
         // address selfAddy,
         // ConditionTokens ct
     ) internal pure returns (
