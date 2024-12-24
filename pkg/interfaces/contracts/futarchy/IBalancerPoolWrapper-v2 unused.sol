@@ -45,21 +45,15 @@ interface IBalancerVault is IVault {
 
 interface IBalancerPoolWrapper {
     function createPool(
-        address tokenHighWeight,
-        address tokenLowWeight,
+        address tokenA,
+        address tokenB,
         uint256 weight
-    ) external returns (address pool);
-
-    // WILL BE REMOVED
-    function create8020Pool(
-        address tokenHighWeight,
-        address tokenLowWeight
     ) external returns (address pool);
 
     function addLiquidity(
         address pool,
-        uint256 amountHighWeightToken,
-        uint256 amountLowWeightToken
+        uint256 amountA,
+        uint256 amountB
     ) external returns (uint256 lpAmount);
 
     function removeLiquidity(

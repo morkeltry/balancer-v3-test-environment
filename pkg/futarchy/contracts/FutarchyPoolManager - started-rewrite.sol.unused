@@ -16,9 +16,11 @@ contract FutarchyPoolManager {
 
     IVault public vault;
     IWeightedPool public basePool;             // TODO: can use non-weighted pools?
-    IERC20Extended public moneyToken;
-    IERC20Extended public quoteToken; 
-    // TODO: moneyToken and quoteToken are so named for convenience to read the code.
+    // IERC20Extended public moneyToken;
+    // IERC20Extended public quoteToken; 
+    IERC20 public moneyToken;
+    IERC20 public quoteToken; 
+    // NB: moneyToken and quoteToken are so named for convenience to read the code.
     // However, the order in which these are populated is dependent on the order that each token
     // was originally registered in the balancer vault. THESE MAY NOT LINE UP!    
     uint256[] public weights; // TODO: decide if better as struct. Remember ordering!
@@ -35,14 +37,18 @@ constructor(
         vault = IVault(_vault);
         basePool = IWeightedPool(_pool);
 
-        IERC20[] tokens = vault.getPoolTokens(pool);
+        IERC20[] memory tokens = vault.getPoolTokens(_pool);
         require (tokens.length==2, "Only pools of two tokens are currently supported");
+        // TODO: Are we using IERC20Extended ? What is it for ? 
+        // moneyToken = IERC20Extended(tokens[0]);
+        // quoteToken = IERC20Extended(tokens[1]);
         moneyToken = tokens[0];
         quoteToken = tokens[1];
 
 
-        uint256[] fetchedWeights = new uint256[](2);
-        WeightedPoolDynamicData _ ;
+        uint256[] memory fetchedWeights = new uint256[](2);
+        // WeightedPoolDynamicData memory  __ ;
+        
         // Is the pool we are accessing IWeightedPool ?
         // success should be true iff getNormalizedWeights() is callable (ie is present on pool)
         (bool success, bytes memory data) = _pool.staticcall(
@@ -53,7 +59,7 @@ constructor(
             weights = abi.decode(data, (uint256[]));
             fetchedWeights[0] = weights[0];
             fetchedWeights[1] = weights[1];
-            _ = pool.getWeightedPoolDynamicData();
+            // __ = basePool.getWeightedPoolDynamicData();
             // TODO: use _
         } else {
             fetchedWeights[0] = 500000;         // TODO: check default weights
@@ -64,9 +70,9 @@ constructor(
     }
 
 
-function getTwoPoolTokens(address _pool) public view returns (IERC20Extended, IERC20Extended) {
+function getTwoPoolTokens(address _pool) public view returns (IERC20, IERC20) {
     // reverts if PoolNotRegistered     
-    IERC20[] tokens = vault.getPoolTokens(_pool);
+    IERC20[] memory tokens = vault.getPoolTokens(_pool);
     require (tokens.length==2, "Only pools of two tokens are currently supported");
     return (tokens[0], tokens[1]);
 }
@@ -85,7 +91,10 @@ function _deployYesNoConditionalTokens() internal returns (address, address, add
 }
 
 function splitFromBasePoolOnCondition(address _pool) public {   //TODO: Access modifier
-    (IERC20Extended money, IERC20Extended quote) = getTwoPoolTokens(_pool);
+    (IERC20 money, IERC20 quote) = getTwoPoolTokens(_pool);
+    // TODO: cast to IERC20Extended if we are using those
+
+
     // TODO: Check vault does not already have a split 
 
 

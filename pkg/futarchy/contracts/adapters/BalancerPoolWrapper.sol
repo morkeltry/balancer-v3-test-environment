@@ -4,46 +4,9 @@ pragma solidity ^0.8.20;
 import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 import "../../../interfaces/contracts/futarchy/IBalancerPoolWrapper.sol";
-import { create as createPool8020Balancer } from "../../../pool-weighted/contracts/WeightedPool8020Factory.sol";
-import { create as createPoolWeightedBalancer } from "../../../pool-weighted/contracts/WeightedPoolFactory.sol";
-
-interface IBalancerVault {
-    struct JoinPoolRequest {
-        address[] assets;
-        uint256[] maxAmountsIn;
-        bytes userData;
-        bool fromInternalBalance;
-    }
-
-    struct ExitPoolRequest {
-        address[] assets;
-        uint256[] minAmountsOut;
-        bytes userData;
-        bool toInternalBalance;
-    }
-
-    function joinPool(
-        bytes32 poolId,
-        address sender,
-        address recipient,
-        JoinPoolRequest memory request
-    ) external payable;
-
-    function exitPool(
-        bytes32 poolId,
-        address sender,
-        address recipient,
-        ExitPoolRequest memory request
-    ) external;
-    
-    function createPool(
-        bytes32 poolId,
-        address[] memory tokens,
-        uint256[] memory weights,
-        address[] memory assetManagers,
-        uint256 swapFeePercentage
-    ) external returns (address);
-}
+// import "../../../interfaces/contracts/vault/IVault.sol";
+import "../../../pool-weighted/contracts/WeightedPool8020Factory.sol";
+import "../../../pool-weighted/contracts/WeightedPoolFactory.sol";
 
 // contract has no storage - suitable for delegatecall if authed functions are safe.
 // delegatecall does not introduce vulns if:
@@ -54,23 +17,11 @@ contract BalancerPoolWrapper {
 
     IBalancerVault public immutable vault;
 
+    string public factoryVersion = "";
+    string public poolVersion = "";
+
     constructor(address _vault) {
-        vault = IBalancerVault(_vault);
-    }
-
-
-    // used for 80/20 and general weighted pools
-    struct TokenConfig {
-        IERC20 token;
-        TokenType tokenType;
-        IRateProvider rateProvider;
-        bool paysYieldFees;
-    }
-        
-    struct PoolRoleAccounts {
-        address pauseManager;
-        address swapFeeManager;
-        address poolCreator;
+        vault = IBalancerVault(_vault);        
     }
 
     // may be called using delegatecall - be careful of authed calls / msg.sender as caller may use this code in its own context.
@@ -80,16 +31,20 @@ contract BalancerPoolWrapper {
     ) external returns (address pool) {
 
         uint256 swapFee = 3000000000000000; // 0.3% swap fee
-
+        uint32 pauseWindowDuration = 0;
         // zeroes
-        PoolRoleAccounts adminRoleAccounts = new PoolRoleAccounts(address(0), address(0), address(0));
+        PoolRoleAccounts memory adminRoleAccounts = PoolRoleAccounts(address(0), address(0), address(0));
 
         // zeroes except for token address
         TokenConfig memory tkConfHigh = TokenConfig(IERC20(tokenHighWeight), TokenType.STANDARD, IRateProvider(address(0)), false);
         TokenConfig memory tkConfLow = TokenConfig(IERC20(tokenLowWeight), TokenType.STANDARD, IRateProvider(address(0)), false);
 
+        WeightedPool8020Factory pool8020Factory = new WeightedPool8020Factory(
+            IVault(vault), pauseWindowDuration, factoryVersion, poolVersion
+        );
+
         // Create pool through Balancer
-        createPool8020Balancer(tkConfHigh, tkConfLow, adminRoleAccounts, swapFee);
+        pool8020Factory.create(tkConfHigh, tkConfLow, adminRoleAccounts, swapFee);
         
         // No assetManagers 
         // https://github.com/balancer/docs-developers/blob/main/references/valuing-balancer-lp-tokens/asset-managers.md
@@ -104,6 +59,8 @@ contract BalancerPoolWrapper {
         uint256 weight
     ) external returns (address pool) {
         require(weight <= 1000000, "Weight must be <= 100%"); // 1000000 = 100%
+
+        revert("THIS FUNCTION IS ONT IMPLEMENTED!");
         
         // Setup pool parameters
         address[] memory tokens = new address[](2);
@@ -150,6 +107,19 @@ contract BalancerPoolWrapper {
         address[] memory assets = new address[](2);
         uint256[] memory maxAmountsIn = new uint256[](2);
         
+
+
+        // TODO: Assess security implications of approve to vault (see @dev notice)
+        // FROM IVaultMain : 
+        //     * @param params Parameters for the add liquidity (see above for struct definition)
+        //     * @return amountsIn Actual amounts of input tokens
+        //     * @return bptAmountOut Output pool token amount
+        //     * @return returnData Arbitrary (optional) data with an encoded response from the pool
+        // function addLiquidity(
+        //         AddLiquidityParams memory params
+        //     ) external returns (uint256[] memory amountsIn, uint256 bptAmountOut, bytes memory returnData);
+
+
         // Join pool with exact amounts
         vault.joinPool(
             poolId,
