@@ -95,46 +95,69 @@ contract BalancerPoolWrapper {
         return pool;
     }
 
+
+
+
+
+
+
     // may be called using delegatecall - be careful of authed calls / msg.sender as caller may use this code in its own context.
     function addLiquidity(
-        address pool,
-        uint256 moneyAmount, 
-        uint256 quoteAmount
+        address _pool,
+        uint256 _moneyAmount, 
+        uint256 _quoteAmount
+        // TODO: we should use minBptAmountOut, at least as a sanity check, even if we don't care about large slippage.
+
+        // you can also accept and pass through userData if you want this function composable (create a shadowed function with the extra input param userData)
+        // bytes calldata userData
     ) external returns (uint256 lpAmount) {
-        // Get poolId from pool address
-        bytes32 poolId; // Need to implement getting poolId from pool address
+        bytes userData;
+        AddLiquidityKind kind = AddLiquidityKind.PROPORTIONAL // NB: will we also allow UNBALANCED and SINGLE_TOKEN_EXACT_OUT ?
+
+        // Get poolId from pool address (NB- kelvin's noote - this is no longer necessary, right?)
         
         address[] memory assets = new address[](2);
         uint256[] memory maxAmountsIn = new uint256[](2);
-        
+        maxAmountsIn[0] = _moneyAmount;
+        maxAmountsIn[1] = _quoteAmount;
 
-
-        // TODO: Assess security implications of approve to vault (see @dev notice)
-        // FROM IVaultMain : 
-        //     * @param params Parameters for the add liquidity (see above for struct definition)
-        //     * @return amountsIn Actual amounts of input tokens
-        //     * @return bptAmountOut Output pool token amount
-        //     * @return returnData Arbitrary (optional) data with an encoded response from the pool
-        // function addLiquidity(
-        //         AddLiquidityParams memory params
-        //     ) external returns (uint256[] memory amountsIn, uint256 bptAmountOut, bytes memory returnData);
-
-
-        // Join pool with exact amounts
-        vault.joinPool(
-            poolId,
-            address(this),
-            msg.sender,
-            IBalancerVault.JoinPoolRequest({
-                assets: assets,
-                maxAmountsIn: maxAmountsIn,
-                userData: abi.encode(moneyAmount, quoteAmount),
-                fromInternalBalance: false
-            })
+        // TODO: check maxAmountsIn/ minBptAmountOut params are what you expect, ie _moneyAmount, _quoteAmount
+        //  * @param maxAmountsIn Maximum amounts of input tokens
+        //  * @param minBptAmountOut Minimum amount of output pool tokens
+        AddLiquidityParams memory params = AddLiquidityParams(
+            _pool, msg.sender, _moneyAmount,  _quoteAmount, kind, userData
         );
 
-        // Need to get LP amount from pool
-        return lpAmount;
+        // TODO: Assess security implications of approve to vault (see @dev notice)
+
+        (uint256[] memory amountsIn, uint256 bptAmountOut, bytes memory returnData) = AddLiquidityParams(params);
+        return bptAmountOut;
+
+                // FROM IVaultMain : 
+                //     * @param params Parameters for the add liquidity (see above for struct definition)
+                //     * @return amountsIn Actual amounts of input tokens
+                //     * @return bptAmountOut Output pool token amount
+                //     * @return returnData Arbitrary (optional) data with an encoded response from the pool
+                //     */
+                // function addLiquidity(
+                //         AddLiquidityParams memory params
+                //     ) external returns (uint256[] memory amountsIn, uint256 bptAmountOut, bytes memory returnData);
+
+                // OLD:
+                // // Join pool with exact amounts
+                // vault.joinPool(
+                //     poolId,
+                //     address(this),
+                //     msg.sender,
+                //     IBalancerVault.JoinPoolRequest({
+                //         assets: assets,
+                //         maxAmountsIn: maxAmountsIn,
+                        /// HUH??? Why are moneyAmount, quoteAmount in userData?
+                //         userData: abi.encode(moneyAmount, quoteAmount),
+                //         fromInternalBalance: false
+                //     })
+                // );
+
     }
 
     function removeLiquidity(

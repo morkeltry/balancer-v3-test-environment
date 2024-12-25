@@ -92,6 +92,8 @@ contract FutarchyPoolManager {
 
     // Use the BalancerPoolWrapper contract to create a token swap ppol in the vault BalancerPoolWrapper was instantiated with.
     // NB currently only using 80/20 weight
+    // TODO: Protect against donate attacks - needs to be disabled on pool using PoolConfig.LiquidityManagement.enableDonation param, 
+    // rather than on addLiquidity (which could be bypassed)
     function createBasePool(
         uint256 _weight_currently_ignored,                // NB currently ignored. Calling 80/20 Factory
         uint256 moneyAmount
