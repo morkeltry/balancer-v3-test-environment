@@ -8,6 +8,9 @@ import "../../../interfaces/contracts/futarchy/IBalancerPoolWrapper.sol";
 import "../../../pool-weighted/contracts/WeightedPool8020Factory.sol";
 import "../../../pool-weighted/contracts/WeightedPoolFactory.sol";
 
+
+// TODO: review visibility - is there any reason the functions should not be external?
+
 // contract has no storage - suitable for delegatecall if authed functions are safe.
 // delegatecall does not introduce vulns if:
 // . this contract does not further delegate calls
@@ -97,10 +100,6 @@ contract BalancerPoolWrapper {
 
 
 
-
-
-
-
     // may be called using delegatecall - be careful of authed calls / msg.sender as caller may use this code in its own context.
     function addLiquidity(
         address _pool,
@@ -113,19 +112,16 @@ contract BalancerPoolWrapper {
     ) external returns (uint256 lpAmount) {
         bytes userData;
         AddLiquidityKind kind = AddLiquidityKind.PROPORTIONAL // NB: will we also allow UNBALANCED and SINGLE_TOKEN_EXACT_OUT ?
+        minBptAmountOut = 1;   // Temporary; See params
 
         // Get poolId from pool address (NB- kelvin's noote - this is no longer necessary, right?)
         
-        address[] memory assets = new address[](2);
         uint256[] memory maxAmountsIn = new uint256[](2);
         maxAmountsIn[0] = _moneyAmount;
         maxAmountsIn[1] = _quoteAmount;
 
-        // TODO: check maxAmountsIn/ minBptAmountOut params are what you expect, ie _moneyAmount, _quoteAmount
-        //  * @param maxAmountsIn Maximum amounts of input tokens
-        //  * @param minBptAmountOut Minimum amount of output pool tokens
         AddLiquidityParams memory params = AddLiquidityParams(
-            _pool, msg.sender, _moneyAmount,  _quoteAmount, kind, userData
+            _pool, msg.sender, maxAmountsIn, minBptAmountOut kind, userData
         );
 
         // TODO: Assess security implications of approve to vault (see @dev notice)
@@ -161,29 +157,25 @@ contract BalancerPoolWrapper {
     }
 
     function removeLiquidity(
-        address pool,
-        uint256 lpAmount
+        address _pool,
+        uint256 _maxBptAmountIn
+        // Setting minAmountsOut[] as a sanity check feels wise, if less important than the minBptAmountOut on addLiquidity
+
     ) external returns (uint256 moneyAmount, uint256 quoteAmount) {
         // Get poolId from pool address
         bytes32 poolId; // Need to implement getting poolId from pool address
 
-        address[] memory assets = new address[](2);
-        uint256[] memory minAmountsOut = new uint256[](2);
+        bytes userData;
+        uint256[] memory minAmountsOut = new uint256[](2);              // zeroes
+        // NB: will we also allow SINGLE_TOKEN_EXACT_IN and SINGLE_TOKEN_EXACT_OUT ?
+        RemoveLiquidityKind kind = RemoveLiquidityKind.PROPORTIONAL 
 
-        // Exit pool with exact LP amount
-        vault.exitPool(
-            poolId,
-            address(this),
-            msg.sender,
-            IBalancerVault.ExitPoolRequest({
-                assets: assets,
-                minAmountsOut: minAmountsOut,
-                userData: abi.encode(lpAmount),
-                toInternalBalance: false
-            })
+        RemoveLiquidityParams memory params = RemoveLiquidityParams(
+            _pool, msg.sender, _maxBptAmountIn, minAmountsOut, kind, userData
         );
 
-        // moneyAmount = 
-        // quoteAmount = 
+        (uint256 bptAmountIn, uint256[] memory amountsOut, bytes memory returnData) = removeLiquidity(params);
+
+        return (amountsOut[0], amountsOut[1]);
     }
 }
