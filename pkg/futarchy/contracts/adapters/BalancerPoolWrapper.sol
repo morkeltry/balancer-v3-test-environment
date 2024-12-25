@@ -110,23 +110,24 @@ contract BalancerPoolWrapper {
         // you can also accept and pass through userData if you want this function composable (create a shadowed function with the extra input param userData)
         // bytes calldata userData
     ) external returns (uint256 lpAmount) {
-        bytes userData;
-        AddLiquidityKind kind = AddLiquidityKind.PROPORTIONAL // NB: will we also allow UNBALANCED and SINGLE_TOKEN_EXACT_OUT ?
-        minBptAmountOut = 1;   // Temporary; See params
 
         // Get poolId from pool address (NB- kelvin's noote - this is no longer necessary, right?)
-        
+
+        bytes memory userData;
+        // NB: will we also allow UNBALANCED and SINGLE_TOKEN_EXACT_OUT ?
+        AddLiquidityKind kind = AddLiquidityKind.PROPORTIONAL;
+        uint256 minBptAmountOut = 1;   // Temporary; See params        
         uint256[] memory maxAmountsIn = new uint256[](2);
         maxAmountsIn[0] = _moneyAmount;
         maxAmountsIn[1] = _quoteAmount;
 
         AddLiquidityParams memory params = AddLiquidityParams(
-            _pool, msg.sender, maxAmountsIn, minBptAmountOut kind, userData
+            _pool, msg.sender, maxAmountsIn, minBptAmountOut, kind, userData
         );
 
         // TODO: Assess security implications of approve to vault (see @dev notice)
 
-        (uint256[] memory amountsIn, uint256 bptAmountOut, bytes memory returnData) = AddLiquidityParams(params);
+        (uint256[] memory amountsIn, uint256 bptAmountOut, bytes memory returnData) = vault.addLiquidity(params);
         return bptAmountOut;
 
                 // FROM IVaultMain : 
@@ -165,16 +166,16 @@ contract BalancerPoolWrapper {
         // Get poolId from pool address
         bytes32 poolId; // Need to implement getting poolId from pool address
 
-        bytes userData;
+        bytes memory userData;
         uint256[] memory minAmountsOut = new uint256[](2);              // zeroes
         // NB: will we also allow SINGLE_TOKEN_EXACT_IN and SINGLE_TOKEN_EXACT_OUT ?
-        RemoveLiquidityKind kind = RemoveLiquidityKind.PROPORTIONAL 
+        RemoveLiquidityKind kind = RemoveLiquidityKind.PROPORTIONAL;
 
         RemoveLiquidityParams memory params = RemoveLiquidityParams(
             _pool, msg.sender, _maxBptAmountIn, minAmountsOut, kind, userData
         );
 
-        (uint256 bptAmountIn, uint256[] memory amountsOut, bytes memory returnData) = removeLiquidity(params);
+        (uint256 bptAmountIn, uint256[] memory amountsOut, bytes memory returnData) = vault.removeLiquidity(params);
 
         return (amountsOut[0], amountsOut[1]);
     }
