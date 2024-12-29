@@ -6,8 +6,6 @@ import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 import "@openzeppelin/contracts/utils/math/Math.sol";
 import "../../interfaces/contracts/futarchy/ICTFAdapter.sol";
 import "../../interfaces/contracts/futarchy/IBalancerPoolWrapper.sol";
-// import {  } from "../adapters/BalancerPoolWrapper.sol";
-// import {  } from "../adapters/CTFAdapter.sol";
 import "./adapters/GnosisCTFAdapter.sol";
 import "./adapters/BalancerPoolWrapper.sol";
 
@@ -65,7 +63,7 @@ contract FutarchyPoolManager {
         address _quoteToken,
         address _moneyToken,            
         bool _useEnhancedSecurity,
-        address _admin                  // ???  why need admin?
+        address _admin               
     ) {
         ctfAdapter = ICTFAdapter(_ctfAdapter);
         balancerWrapper = IBalancerPoolWrapper(_balancerWrapper);
@@ -116,7 +114,6 @@ contract FutarchyPoolManager {
         (success, data) = address(balancerWrapper).delegatecall(
             abi.encodeWithSignature("create8020Pool(address,address)", moneyToken, quoteToken)
         );        
-        // TODO: Custom Errors more efficient
         require(success, "Delegatecall failed to create8020Pool(address,address) on balancerWrapper");
         address newPool = abi.decode(data, (address));
 
@@ -124,7 +121,6 @@ contract FutarchyPoolManager {
         (success, ) = address(balancerWrapper).delegatecall(
             abi.encodeWithSignature("addLiquidity(address,uint256,uint256)", newPool, moneyAmount, quoteAmount)
         );
-        // TODO: Custom Errors more efficient
         require(success, "Delegatecall failed to addLiquidity(address,uint256,uint256) on balancerWrapper");
 
         basePool = newPool;
@@ -135,11 +131,8 @@ contract FutarchyPoolManager {
         bytes32 conditionId,
         uint256 baseAmount
     ) external returns (address yesPool, address noPool) {
-        // ???
         if (conditionPools[conditionId].isActive) revert ConditionAlreadyActive();
-        // TODO: what to do if conditionId exists but is not 'active'?
-
-        // TODO: need useEnhancedSecurity check??
+        // Consider sanity check: is it possible to reach situation where conditionId exists but is not 'active'?
 
         // NB swapped order so that moneyToken / highWeightToken / 80% comes first
         (uint256 moneyAmount, uint256 quoteAmount) = balancerWrapper.removeLiquidity(basePool, baseAmount);
@@ -166,8 +159,6 @@ contract FutarchyPoolManager {
         (address moneyYes, address moneyNo, address quoteYes, address quoteNo ) = _doSplit(conditionId, moneyAmount, quoteAmount);
 
         // NB general createPool not yet implemented, only create8020Pool
-        // yesPool = balancerWrapper.createPool(moneyYes, quoteYes, 500000);
-        // noPool = balancerWrapper.createPool(moneyNo, quoteNo, 500000);
         yesPool = balancerWrapper.create8020Pool(moneyYes, quoteYes);
         noPool = balancerWrapper.create8020Pool(moneyNo, quoteNo);
 
@@ -205,7 +196,7 @@ contract FutarchyPoolManager {
         (balancesToVerify memory afterMoney, balancesToVerify memory afterQuote)  = _getBalances(ct);
 
 
-        // TODO: Is this gas exhaustion safe? (check is post-effect)
+        // NB: this check is post-effect and therefore susceptibility to gas exhaustion should be assessed.
         if (useEnhancedSecurity) {
             _verifyMergeAllSides(beforeQuote, afterQuote);
             _verifyMergeAllSides(beforeMoney, afterMoney);
@@ -221,7 +212,6 @@ contract FutarchyPoolManager {
         delete conditionPools[conditionId];
         delete conditionTokens[conditionId];
 
-        // TODO: Is cast necessary?
         emit MergePerformed(address(quoteToken), ct.quoteYesToken);
         emit MergePerformed(address(moneyToken), ct.moneyYesToken);
     }
@@ -245,13 +235,13 @@ contract FutarchyPoolManager {
         monNo = monC[0];
     }
 
-    // kinda unnecessary - any sanity checks should take place well before storage
+    // NB: sanity checks should take place well before storage
     function _storeConditionPools(bytes32 conditionId, address yesPool, address noPool) internal {
         // TODO: add existence check
         conditionPools[conditionId] = ConditionalPools(yesPool, noPool, true);
     }
 
-    // kinda unnecessary - any sanity checks should take place well before storage
+    // NB: sanity checks should take place well before storage
     function _storeConditionTokens(
         bytes32 conditionId,
         address moneyYes,
@@ -264,7 +254,6 @@ contract FutarchyPoolManager {
     }
 
     // TODO: check- are 'Yes' and 'No' canonical?
-    // ??? How do we know yes/ no as tokens if they are not split yet?
     function _enforceAllowedSplit(address baseTok, address yesTok, address noTok) internal view {
         if (!allowedSplits[keccak256(abi.encodePacked(baseTok, yesTok, noTok))]) revert SplitNotAllowed();
     }

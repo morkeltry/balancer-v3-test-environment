@@ -5,8 +5,6 @@ import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 import "../../../interfaces/contracts/futarchy/IBalancerPoolWrapper.sol";
 // import "../../../interfaces/contracts/vault/IVault.sol";
-// import "../../../pool-weighted/contracts/WeightedPool8020Factory.sol";
-// import "../../../pool-weighted/contracts/WeightedPoolFactory.sol";
 
 
 // TODO: review visibility - is there any reason the functions should not be external?
@@ -35,7 +33,6 @@ contract BalancerPoolWrapper {
 
         uint256 swapFee = 3000000000000000; // 0.3% swap fee
         uint32 pauseWindowDuration = 0;
-        // zeroes
         PoolRoleAccounts memory adminRoleAccounts = PoolRoleAccounts(address(0), address(0), address(0));
 
         // zeroes except for token address
@@ -63,7 +60,7 @@ contract BalancerPoolWrapper {
     ) external returns (address pool) {
         require(weight <= 1000000, "Weight must be <= 100%"); // 1000000 = 100%
 
-        revert("THIS FUNCTION IS ONT IMPLEMENTED!");
+        revert("THIS FUNCTION IS NOT IMPLEMENTED!");
         
         // Setup pool parameters
         address[] memory tokens = new address[](2);
@@ -98,25 +95,19 @@ contract BalancerPoolWrapper {
         return pool;
     }
 
-
-
     // may be called using delegatecall - be careful of authed calls / msg.sender as caller may use this code in its own context.
     function addLiquidity(
         address _pool,
         uint256 _moneyAmount, 
         uint256 _quoteAmount
-        // TODO: we should use minBptAmountOut, at least as a sanity check, even if we don't care about large slippage.
 
-        // you can also accept and pass through userData if you want this function composable (create a shadowed function with the extra input param userData)
-        // bytes calldata userData
+        // you can also accept and pass through userData if you want this function composable 
+        // (create a shadowed function with the extra input param  bytes calldata userData)
     ) external returns (uint256 lpAmount) {
-
-        // Get poolId from pool address (NB- kelvin's noote - this is no longer necessary, right?)
-
         bytes memory userData;
         // NB: will we also allow UNBALANCED and SINGLE_TOKEN_EXACT_OUT ?
         AddLiquidityKind kind = AddLiquidityKind.PROPORTIONAL;
-        uint256 minBptAmountOut = 1;   // Temporary; See params        
+        uint256 minBptAmountOut = 1;   // Temporary; Consider using minBptAmountOut as a proper sanity check, even if we don't care about large slippage.        
         uint256[] memory maxAmountsIn = new uint256[](2);
         maxAmountsIn[0] = _moneyAmount;
         maxAmountsIn[1] = _quoteAmount;
@@ -125,49 +116,20 @@ contract BalancerPoolWrapper {
             _pool, msg.sender, maxAmountsIn, minBptAmountOut, kind, userData
         );
 
-        // TODO: Assess security implications of approve to vault (see @dev notice)
+        // NB: approve to vault has security implications  (see @dev notice). Consider these.
 
         (uint256[] memory amountsIn, uint256 bptAmountOut, bytes memory returnData) = vault.addLiquidity(params);
         return bptAmountOut;
-
-                // FROM IVaultMain : 
-                //     * @param params Parameters for the add liquidity (see above for struct definition)
-                //     * @return amountsIn Actual amounts of input tokens
-                //     * @return bptAmountOut Output pool token amount
-                //     * @return returnData Arbitrary (optional) data with an encoded response from the pool
-                //     */
-                // function addLiquidity(
-                //         AddLiquidityParams memory params
-                //     ) external returns (uint256[] memory amountsIn, uint256 bptAmountOut, bytes memory returnData);
-
-                // OLD:
-                // // Join pool with exact amounts
-                // vault.joinPool(
-                //     poolId,
-                //     address(this),
-                //     msg.sender,
-                //     IBalancerVault.JoinPoolRequest({
-                //         assets: assets,
-                //         maxAmountsIn: maxAmountsIn,
-                        /// HUH??? Why are moneyAmount, quoteAmount in userData?
-                //         userData: abi.encode(moneyAmount, quoteAmount),
-                //         fromInternalBalance: false
-                //     })
-                // );
-
         // NB: amountsIn and returnData are unused and if not returned from this function, should not be set       
-
     }
 
     function removeLiquidity(
         address _pool,
         uint256 _maxBptAmountIn
-        // Setting minAmountsOut[] as a sanity check feels wise, if less important than the minBptAmountOut on addLiquidity
+        // consider setting minAmountsOut[] as a sanity check - this feels sensible, even if less important than the minBptAmountOut on addLiquidity
 
     ) external returns (uint256 moneyAmount, uint256 quoteAmount) {
-        // Get poolId from pool address
-        bytes32 poolId; // Need to implement getting poolId from pool address
-
+        bytes32 poolId;
         bytes memory userData;
         uint256[] memory minAmountsOut = new uint256[](2);              // zeroes
         // NB: will we also allow SINGLE_TOKEN_EXACT_IN and SINGLE_TOKEN_EXACT_OUT ?
@@ -178,7 +140,7 @@ contract BalancerPoolWrapper {
         );
 
         (uint256 bptAmountIn, uint256[] memory amountsOut, bytes memory returnData) = vault.removeLiquidity(params);
-        // NB: bptAmountIn and returnData are unused and if not returned from this function, should not be set 
+        // NB: bptAmountIn and returnData are unused and if not returned from this function, should not be set.
 
         return (amountsOut[0], amountsOut[1]);
     }
