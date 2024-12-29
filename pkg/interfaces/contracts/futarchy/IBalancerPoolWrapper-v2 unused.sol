@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.20;
 
-import "../../../pool-weighted/contracts/WeightedPool8020Factory.sol";
+import "@balancer-labs/v3-pool-weighted/contracts/WeightedPool8020Factory.sol";
 // import "../../../pool-weighted/contracts/WeightedPoolFactory.sol";
 
 interface IBalancerVault is IVault {

@@ -5,8 +5,8 @@ import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 import "../../../interfaces/contracts/futarchy/IBalancerPoolWrapper.sol";
 // import "../../../interfaces/contracts/vault/IVault.sol";
-import "../../../pool-weighted/contracts/WeightedPool8020Factory.sol";
-import "../../../pool-weighted/contracts/WeightedPoolFactory.sol";
+// import "../../../pool-weighted/contracts/WeightedPool8020Factory.sol";
+// import "../../../pool-weighted/contracts/WeightedPoolFactory.sol";
 
 
 // TODO: review visibility - is there any reason the functions should not be external?
@@ -155,6 +155,8 @@ contract BalancerPoolWrapper {
                 //     })
                 // );
 
+        // NB: amountsIn and returnData are unused and if not returned from this function, should not be set       
+
     }
 
     function removeLiquidity(
@@ -176,6 +178,7 @@ contract BalancerPoolWrapper {
         );
 
         (uint256 bptAmountIn, uint256[] memory amountsOut, bytes memory returnData) = vault.removeLiquidity(params);
+        // NB: bptAmountIn and returnData are unused and if not returned from this function, should not be set 
 
         return (amountsOut[0], amountsOut[1]);
     }

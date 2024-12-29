@@ -171,6 +171,7 @@ contract FutarchyPoolManager {
         yesPool = balancerWrapper.create8020Pool(moneyYes, quoteYes);
         noPool = balancerWrapper.create8020Pool(moneyNo, quoteNo);
 
+        // call the storage functiuons here, don't store direct
         conditionPools[conditionId] = ConditionalPools(yesPool, noPool, true);
         conditionTokens[conditionId] = ConditionTokens(moneyYes, moneyNo, quoteYes, quoteNo);
 
@@ -258,6 +259,7 @@ contract FutarchyPoolManager {
         address quoteYes,
         address quoteNo
     ) internal {
+        // checks here
         conditionTokens[conditionId] = ConditionTokens(moneyYes, moneyNo, quoteYes, quoteNo);
     }
 
