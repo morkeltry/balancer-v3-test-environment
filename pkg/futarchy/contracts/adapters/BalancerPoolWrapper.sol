@@ -127,11 +127,10 @@ contract BalancerPoolWrapper {
         address _pool,
         uint256 _maxBptAmountIn
         // consider setting minAmountsOut[] as a sanity check - this feels sensible, even if less important than the minBptAmountOut on addLiquidity
-
     ) external returns (uint256 moneyAmount, uint256 quoteAmount) {
         bytes32 poolId;
         bytes memory userData;
-        uint256[] memory minAmountsOut = new uint256[](2);              // zeroes
+        uint256[] memory minAmountsOut = new uint256[](2);
         // NB: will we also allow SINGLE_TOKEN_EXACT_IN and SINGLE_TOKEN_EXACT_OUT ?
         RemoveLiquidityKind kind = RemoveLiquidityKind.PROPORTIONAL;
 

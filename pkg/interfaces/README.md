@@ -1,19 +1,14 @@
 # <img src="../../logo.svg" alt="Balancer" height="128px">
 
-# Balancer V3 Interfaces
+# Install
 
-This package contains interfaces used in dependent packages, which makes building systems that interact with Balancer contracts simpler, as the implementation information is not included.
+`yarn install`
 
-## Overview
 
-### Installation
+# Compilation
 
-NPM package coming soon.
+To compile the whole balancer framework, `yarn build`
+(NB imports need resolving between balancer workspaces)
 
-### Usage
+To compile the bespoke contracts, `cd pkg/futarchy && forge build`
 
-This package can be used in multiple ways, including interacting with already deployed Pools, or performing local testing. It contains all interfaces used in the system, from the foundational [Vault](contracts/vault/IVault.sol) to very specific contracts.
-
-## Licensing
-
-[GNU General Public License Version 3 (GPL v3)](../../LICENSE).
