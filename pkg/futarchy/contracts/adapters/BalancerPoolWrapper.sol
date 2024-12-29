@@ -6,9 +6,6 @@ import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 import "../../../interfaces/contracts/futarchy/IBalancerPoolWrapper.sol";
 // import "../../../interfaces/contracts/vault/IVault.sol";
 
-
-// TODO: review visibility - is there any reason the functions should not be external?
-
 // contract has no storage - suitable for delegatecall if authed functions are safe.
 // delegatecall does not introduce vulns if:
 // . this contract does not further delegate calls
